@@ -4,7 +4,9 @@ Windows 下的 PowerShell 菜单，用来暂停或恢复广联达和 SenseShield
 
 ## 使用方法
 
-在项目目录打开 PowerShell，运行：
+下载 [GlodonLicenseSwitch-Launcher.cmd](https://github.com/yoonagoo/glodon-license-switch/releases/latest/download/GlodonLicenseSwitch-Launcher.cmd)，双击运行。每次打开都会先获取 GitHub 主分支的最新脚本，下载成功后再打开菜单。以后可以继续使用同一个启动器。
+
+也可以在项目目录打开 PowerShell，直接运行脚本：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\GlodonLicenseSwitch.ps1
