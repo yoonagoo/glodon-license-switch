@@ -75,6 +75,30 @@ function Get-Helpers {
     }
 }
 
+function Stop-Helpers {
+    $timer = [Diagnostics.Stopwatch]::StartNew()
+    $requested = [Collections.Generic.HashSet[int]]::new()
+    $previousScanEmpty = $false
+    do {
+        $remaining = @(Get-Helpers)
+        if (!$remaining.Count -and $previousScanEmpty) { return }
+        $previousScanEmpty = !$remaining.Count
+        foreach ($process in $remaining) {
+            if (!$requested.Add($process.Id)) { continue }
+            try { Stop-Process -InputObject $process -Force }
+            catch { if (!$process.HasExited) { throw } }
+        }
+        # A terminated process may still appear in the next scan, or its watchdog may restart it once.
+        Start-Sleep -Milliseconds 250
+    } while ($timer.Elapsed.TotalSeconds -lt 5)
+
+    $remaining = @(Get-Helpers)
+    if ($remaining.Count) {
+        $details = $remaining | ForEach-Object { "$($_.ProcessName) (PID $($_.Id))" }
+        throw "等待 5 秒后仍有后台进程运行：$($details -join ', ')"
+    }
+}
+
 function Invoke-Sc([string[]]$arguments) {
     $result = & $sc @arguments
     if ($LASTEXITCODE -ne 0) { throw ($result -join [Environment]::NewLine) }
@@ -172,12 +196,7 @@ function Pause-Targets($current,$startups) {
                 Write-Warning "$name is disabled. Restart Windows if it is still loaded."
             }
         }
-        foreach ($process in Get-Helpers) {
-            try { Stop-Process -InputObject $process -Force }
-            catch { if (!$process.HasExited) { throw } }
-        }
-        $remaining = @(Get-Helpers)
-        if ($remaining.Count) { throw "Background processes are still running: $($remaining.ProcessName -join ', ')" }
+        Stop-Helpers
         # The GrandDog watchdog can restore automatic startup during shutdown.
         foreach ($name in $targets.Keys) {
             if ((Get-Target $name).Start -ne 4) { Invoke-Sc @('config',$name,'start=','disabled') }
