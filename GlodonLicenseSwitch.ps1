@@ -10,9 +10,10 @@ $gcp = Join-Path $env:CommonProgramFiles 'Glodon Shared\GCP'
 $dog = Join-Path $cf86 'Grandsoft Shared\GrandDog'
 $glodon = Join-Path $pf86 'Glodon'
 $sense = Join-Path $pf86 'senseshield\ss'
+$gtjRoots = @("$pf86\GrandSoft\GTJ2026","$env:ProgramFiles\Glodon\GTJ2026")
 # Stop dependents first, then restore in the opposite order.
 $targets = [ordered]@{
-    GTJLaunchService = "$pf86\GrandSoft\GTJ2026\bin\GMPLaunchService.exe"
+    GTJLaunchService = @($gtjRoots | ForEach-Object { "$_\bin\GMPLaunchService.exe" })
     gcpsvc = "$gcp\*\GCPService.exe"
     GSCService = "$dog\*\GSCService.exe"
     gssvc = "$glodon\GSSP\gsspservice.exe"
@@ -46,7 +47,10 @@ function Get-Image([string]$command) {
 
 function Get-Target([string]$name,[switch]$ForDisplay) {
     $key = Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$name"
-    if ((Get-Image $key.ImagePath) -notlike $targets[$name]) { throw "The configured image for $name has changed: $($key.ImagePath)" }
+    $image = Get-Image $key.ImagePath
+    if (!($targets[$name] | Where-Object { $image -like $_ })) {
+        throw "The configured image for $name does not match a supported path: $($key.ImagePath)"
+    }
     $status = [System.ServiceProcess.ServiceController]::new($name).Status
     if (!$ForDisplay -and $status -notin @('Stopped','Running')) { throw "$name is $status. Try again when it reaches Running or Stopped." }
     [pscustomobject]@{Name=$name; Start=[int]$key.Start; Delayed=[bool]$key.DelayedAutoStart; Status=$status; Running=($status -eq 'Running')}
@@ -239,9 +243,9 @@ function Write-MenuChoices {
 function Show-Status {
     $current = @($targets.Keys | ForEach-Object { Get-Target $_ -ForDisplay })
     $startups = @($runEntries.Keys | ForEach-Object { Get-Startup $_ })
-    $sources = @($targets.Values) + $helpers
+    $sources = @($targets.Values | ForEach-Object { $_ }) + $helpers
     $known = @($sources | Where-Object { $_ -like '*.exe' } | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object -Unique)
-    $relatedRoots = @("$gcp\*","$dog\*","$glodon\*","$sense\*","$pf86\GrandSoft\*")
+    $relatedRoots = @("$gcp\*","$dog\*","$glodon\*","$sense\*","$pf86\GrandSoft\*") + @($gtjRoots | ForEach-Object { "$_\*" })
     $observed = @(Get-CimInstance Win32_Process | Where-Object {
         $process = $_
         if (!$process.ExecutablePath) { return $process.Name -in $known }

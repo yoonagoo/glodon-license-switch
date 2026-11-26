@@ -24,6 +24,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\GlodonLicenseSwitch.ps
 
 - 需要 64 位 Windows 和 64 位 Windows PowerShell 5.1。在 Windows 11 上验证过。
 - 服务：`GTJLaunchService`、`gcpsvc`、`GSCService`、`gssvc`、`SSMonitorService`、`Sense Shield Service`、`Virbox License Control Center`。
+- GTJ2026 支持位于 64 位 Program Files 下的 `Glodon\GTJ2026`，以及 32 位 Program Files 下的 `GrandSoft\GTJ2026`。
 - 驱动：`elite5`、`sprotect2`、`slock2`。登录启动项：`GSCServer`、`GWS`。
 - 脚本会校验这套服务名称和程序路径。组件缺失、安装路径或服务名称不同的机器，可能需要先适配脚本。驱动仍在加载时，菜单会提示是否需要重启。
 
