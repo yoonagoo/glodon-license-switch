@@ -1,6 +1,31 @@
 ﻿
 param([ValidateSet('Menu','Status','Pause','Resume')][string]$Action='Menu')
 $ErrorActionPreference = 'Stop'
+
+function Get-SystemIssues {
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT -or ![Environment]::Is64BitProcess) {
+        '需要 64 位 Windows 和 64 位 PowerShell。'
+    }
+    if ($PSVersionTable.PSVersion -lt [version]'5.1') { '需要 PowerShell 5.1 或更新版本。' }
+    if (!(Get-Command Get-CimInstance -ErrorAction SilentlyContinue)) {
+        '缺少 CimCmdlets 组件，无法读取 Windows 进程。'
+    }
+    try { Add-Type -AssemblyName System.ServiceProcess }
+    catch { '缺少 .NET 的 System.ServiceProcess 组件，无法管理 Windows 服务。' }
+    if (!$env:windir -or !(Test-Path -LiteralPath (Join-Path $env:windir 'System32\sc.exe') -PathType Leaf)) {
+        '缺少 Windows 服务管理工具 sc.exe。'
+    }
+    if (!$env:LOCALAPPDATA) { '无法定位当前用户的本地应用数据目录。' }
+}
+
+$systemIssues = @(Get-SystemIssues)
+if ($systemIssues.Count) {
+    Write-Host '==== 系统检测未通过 ====' -ForegroundColor Red
+    $systemIssues | ForEach-Object { Write-Host "  - $_" -ForegroundColor Red }
+    if ($Action -eq 'Menu' -and ![Console]::IsInputRedirected) { [void](Read-Host '按回车退出') }
+    exit 1
+}
+
 $stateDirectory = Join-Path $env:LOCALAPPDATA 'GlodonLicenseSwitch'
 $stateFile = Join-Path $stateDirectory 'original-state.json'
 $sc = Join-Path $env:windir 'System32\sc.exe'
@@ -46,14 +71,16 @@ function Get-Image([string]$command) {
 }
 
 function Get-Target([string]$name,[switch]$ForDisplay) {
-    $key = Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$name"
+    try { $key = Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$name" }
+    catch [System.Management.Automation.ItemNotFoundException] { throw "缺少服务或驱动：$name。请检查对应组件是否已安装。" }
+    if (!$key.ImagePath) { throw "服务或驱动 $name 缺少程序路径。" }
     $image = Get-Image $key.ImagePath
     if (!($targets[$name] | Where-Object { $image -like $_ })) {
-        throw "The configured image for $name does not match a supported path: $($key.ImagePath)"
+        throw "服务或驱动 $name 的程序路径暂不受支持：$($key.ImagePath)"
     }
     $status = [System.ServiceProcess.ServiceController]::new($name).Status
     if (!$ForDisplay -and $status -notin @('Stopped','Running')) { throw "$name is $status. Try again when it reaches Running or Stopped." }
-    [pscustomobject]@{Name=$name; Start=[int]$key.Start; Delayed=[bool]$key.DelayedAutoStart; Status=$status; Running=($status -eq 'Running')}
+    [pscustomobject]@{Name=$name; Start=[int]$key.Start; Delayed=[bool]$key.DelayedAutoStart; Status=$status; Running=($status -eq 'Running'); Image=$image}
 }
 
 function Get-Startup([string]$name) {
@@ -62,7 +89,7 @@ function Get-Startup([string]$name) {
     if (!$key -or $name -notin $key.GetValueNames()) { return }
     $value = $key.GetValue($name,$null,[Microsoft.Win32.RegistryValueOptions]::DoNotExpandEnvironmentNames)
     $kind = [string]$key.GetValueKind($name)
-    if ($kind -notin @('String','ExpandString') -or (Get-Image $value) -notlike $entry.Image) { throw "The startup entry $name has changed." }
+    if ($kind -notin @('String','ExpandString') -or (Get-Image $value) -notlike $entry.Image) { throw "登录启动项 $name 的程序路径或注册类型暂不受支持。" }
     [pscustomobject]@{Name=$name; Value=$value; Kind=$kind}
 }
 
@@ -218,8 +245,6 @@ function Pause-Targets($current,$startups) {
     }
 }
 
-Add-Type -AssemblyName System.ServiceProcess
-
 function Invoke-Switch([string]$operation) {
     $user = [Security.Principal.WindowsIdentity]::GetCurrent()
     if (![Security.Principal.WindowsPrincipal]::new($user).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
@@ -260,8 +285,22 @@ function Write-MenuChoices {
 }
 
 function Show-Status {
-    $current = @($targets.Keys | ForEach-Object { Get-Target $_ -ForDisplay })
-    $startups = @($runEntries.Keys | ForEach-Object { Get-Startup $_ })
+    $problems = [Collections.Generic.List[string]]::new()
+    $current = @(foreach ($name in $targets.Keys) {
+        try { Get-Target $name -ForDisplay }
+        catch { $problems.Add($_.Exception.Message) }
+    })
+    $startups = @(foreach ($name in $runEntries.Keys) {
+        try { Get-Startup $name }
+        catch { $problems.Add($_.Exception.Message) }
+    })
+    $missingFiles = @(foreach ($entry in $current) {
+        if (!(Test-Path -LiteralPath $entry.Image -PathType Leaf)) { "$($entry.Name)：$($entry.Image)" }
+    }
+    foreach ($entry in $startups) {
+        $image = Get-Image $entry.Value
+        if (!(Test-Path -LiteralPath $image -PathType Leaf)) { "$($entry.Name)：$image" }
+    })
     $sources = @($targets.Values | ForEach-Object { $_ }) + $helpers
     $known = @($sources | Where-Object { $_ -like '*.exe' } | ForEach-Object { Split-Path -Leaf $_ } | Sort-Object -Unique)
     $relatedRoots = @("$gcp\*","$dog\*","$glodon\*","$sense\*","$pf86\GrandSoft\*") + @($gtjRoots | ForEach-Object { "$_\*" })
@@ -276,12 +315,12 @@ function Show-Status {
     $saved = Test-Path -LiteralPath $stateFile
     $configuredOff = ($current.Start | Where-Object { $_ -ne 4 } | Measure-Object).Count -eq 0 -and !$startups.Count
     $active = ($current.Status | Where-Object { $_ -ne 'Stopped' } | Measure-Object).Count -gt 0 -or $observed.Count -gt 0
-    $status = if ($configuredOff -and !$active) { '已关闭，重启后保持关闭' }
+    $status = if ($problems.Count) { '组件检测未通过，暂不能切换' } elseif ($configuredOff -and !$active) { '已关闭，重启后保持关闭' }
     elseif ($configuredOff) { '启动已禁用，仍有相关项目运行或正在切换' }
     elseif ($saved) { '部分开启，原设置仍可恢复' }
     else { '已开启，按当前 Windows 设置运行' }
 
-    $statusColor = if ($configuredOff -and !$active) { 'Gray' }
+    $statusColor = if ($problems.Count) { 'Red' } elseif ($configuredOff -and !$active) { 'Gray' }
     elseif ($configuredOff -or $saved) { 'Yellow' }
     else { 'Green' }
     $rule = '=' * 66
@@ -292,7 +331,16 @@ function Show-Status {
     Write-Host $status -ForegroundColor $statusColor
     Write-Host $rule -ForegroundColor DarkCyan
 
-    Write-Section "服务和驱动（$($current.Count - $drivers.Count) 项服务 / $($drivers.Count) 项驱动）"
+    Write-Section '系统与组件检测'
+    Write-Host "  64 位 Windows / PowerShell $($PSVersionTable.PSVersion)" -ForegroundColor Green
+    if (!$problems.Count -and !$missingFiles.Count) { Write-Host '  所需组件检查通过。' -ForegroundColor Green }
+    foreach ($problem in $problems) { Write-Host "  [无法切换] $problem" -ForegroundColor Red }
+    foreach ($file in $missingFiles) { Write-Host "  [文件缺失] $file" -ForegroundColor Yellow }
+    if ($missingFiles.Count -and !$problems.Count) {
+        Write-Host '  已注册项目仍可关闭。需要使用缺件组件时，请先修复对应安装。' -ForegroundColor Yellow
+    }
+
+    Write-Section '服务和驱动'
     Write-Host ('  {0,-32}{1,-6}{2,-12}{3}' -f '名称','类型','运行状态','启动方式') -ForegroundColor DarkCyan
     $statusNames = @{Stopped='已停止';Running='运行中';StartPending='正在启动';StopPending='正在停止';Paused='已暂停'}
     $startNames = @('引导启动','系统启动','自动','手动','禁用')

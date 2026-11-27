@@ -22,6 +22,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\GlodonLicenseSwitch.ps
 | `2` | 停止并禁用目标服务和驱动，暂停登录启动项。该设置在重启后仍然有效。 |
 | `0` | 退出菜单。 |
 
+菜单会检查 PowerShell、Windows 服务管理组件、相关服务和驱动以及对应程序文件。缺少服务或驱动注册、或路径不受支持时，菜单会列出问题。文件缺失会单独提示。注册信息正常时，仍可关闭对应项目。
+
 只查看当前状态时，可以加 `-Action Status`，无需提升为管理员。
 
 ## 适用范围
