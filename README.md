@@ -4,7 +4,9 @@ Windows 下的 PowerShell 菜单，用来暂停或恢复广联达和 SenseShield
 
 ## 使用方法
 
-下载 [GlodonLicenseSwitch-Launcher.cmd](https://github.com/yoonagoo/glodon-license-switch/releases/latest/download/GlodonLicenseSwitch-Launcher.cmd)，双击运行。每次打开都会先获取 GitHub 主分支的最新脚本，下载成功后再打开菜单。以后可以继续使用同一个启动器。
+下载 [中文启动器压缩包](https://github.com/yoonagoo/glodon-license-switch/releases/latest/download/GlodonLicenseSwitch-zh-CN.zip)，解压后双击 **广联达与 Virbox 开关.exe**。也可以运行同名的 CMD 版本。EXE 自带图标，两个版本均可单独使用。每次打开都会先获取 GitHub 主分支的最新脚本，下载成功后再打开菜单。
+
+原来的 [CMD 直接下载链接](https://github.com/yoonagoo/glodon-license-switch/releases/latest/download/GlodonLicenseSwitch-Launcher.cmd) 继续可用。
 
 也可以在项目目录打开 PowerShell，直接运行脚本：
 
@@ -31,3 +33,13 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\GlodonLicenseSwitch.ps
 - 脚本会校验这套服务名称和程序路径。组件缺失、安装路径或服务名称不同的机器，可能需要先适配脚本。驱动仍在加载时，菜单会提示是否需要重启。
 
 首次关闭时，脚本把原有配置写入 `%LOCALAPPDATA%\GlodonLicenseSwitch\original-state.json`。需要恢复时请保留该文件。同一 Windows 用户从不同仓库目录运行脚本，会使用同一份恢复记录。
+
+## 构建中文启动器
+
+在项目目录用 64 位 Windows PowerShell 运行：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\Build-Launcher.ps1
+```
+
+产物保存在 dist 目录，包括中文 EXE、CMD 和发布压缩包。
