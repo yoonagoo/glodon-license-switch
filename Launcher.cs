@@ -6,8 +6,8 @@ using System.Reflection;
 
 [assembly: AssemblyTitle("广联达与 Virbox 开关")]
 [assembly: AssemblyDescription("下载并启动最新版的广联达与 Virbox 开关")]
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.1.1.0")]
+[assembly: AssemblyFileVersion("1.1.1.0")]
 
 internal static class Launcher
 {

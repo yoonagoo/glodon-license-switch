@@ -13,9 +13,14 @@ if not exist "%GLD_POWERSHELL%" goto missing_powershell
     "[void][IO.Directory]::CreateDirectory($dir);" ^
     "$script = Join-Path $dir 'GlodonLicenseSwitch.ps1';" ^
     "$download = Join-Path $dir ([guid]::NewGuid().ToString('N') + '.download');" ^
-    "$url = 'https://raw.githubusercontent.com/yoonagoo/glodon-license-switch/main/GlodonLicenseSwitch.ps1?v=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();" ^
     "try {" ^
     "    Write-Host 'Downloading the latest Glodon License Switch...';" ^
+    "    $refUrl = 'https://api.github.com/repos/yoonagoo/glodon-license-switch/git/ref/heads/main?v=' + [DateTimeOffset]::UtcNow.ToUnixTimeMilliseconds();" ^
+    "    $ref = Invoke-RestMethod -UseBasicParsing -Uri $refUrl -Headers @{'Cache-Control' = 'no-cache'} -TimeoutSec 30;" ^
+    "    $sha = $ref.object.sha;" ^
+    "    if ($sha -notmatch '^[0-9a-f]{40}$') { throw 'Unable to determine the latest GitHub commit.' }" ^
+    "    $url = 'https://raw.githubusercontent.com/yoonagoo/glodon-license-switch/' + $sha + '/GlodonLicenseSwitch.ps1';" ^
+    "    Write-Host ('GitHub commit: ' + $sha.Substring(0,7));" ^
     "    Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $download -TimeoutSec 30;" ^
     "    $tokens = $null; $errors = $null;" ^
     "    $ast = [Management.Automation.Language.Parser]::ParseFile($download, [ref]$tokens, [ref]$errors);" ^

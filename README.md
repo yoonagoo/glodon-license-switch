@@ -4,7 +4,7 @@ Windows 下的 PowerShell 菜单，用来暂停或恢复广联达和 SenseShield
 
 ## 使用方法
 
-下载 [中文启动器压缩包](https://github.com/yoonagoo/glodon-license-switch/releases/latest/download/GlodonLicenseSwitch-zh-CN.zip)，解压后双击 **广联达与 Virbox 开关.exe**。也可以运行同名的 CMD 版本。EXE 自带图标，两个版本均可单独使用。每次打开都会先获取 GitHub 主分支的最新脚本，下载成功后再打开菜单。
+下载 [中文启动器压缩包](https://github.com/yoonagoo/glodon-license-switch/releases/latest/download/GlodonLicenseSwitch-zh-CN.zip)，解压后双击 **广联达与 Virbox 开关.exe**。也可以运行同名的 CMD 版本。EXE 自带图标，两个版本均可单独使用。每次打开都会先查询 GitHub 主分支的最新提交，按提交号下载脚本后再打开菜单。
 
 原来的 [CMD 直接下载链接](https://github.com/yoonagoo/glodon-license-switch/releases/latest/download/GlodonLicenseSwitch-Launcher.cmd) 继续可用。
 
